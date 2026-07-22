@@ -1,6 +1,6 @@
 import django_filters
 
-from feeds.models import Post
+from posts.models import Post
 
 
 class PostFilter(django_filters.FilterSet):
