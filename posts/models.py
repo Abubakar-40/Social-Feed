@@ -1,6 +1,5 @@
 from django.db import models
 
-from posts.managers import PostManager
 from users.models import BaseModel
 
 
@@ -20,9 +19,6 @@ class Post(BaseModel):
     content = models.TextField()
 
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="posts")
-    hashtags = models.ManyToManyField("posts.Hashtag", through="posts.PostHashtag", related_name="posts", blank=True)
-
-    objects = PostManager()
 
     class Meta:
         verbose_name = "Post"

@@ -36,7 +36,7 @@ Create auth tokens for users via `/admin/authtoken/tokenproxy/` or the Django sh
 
 ## API Endpoints
 
-All endpoints are prefixed with `/api/posts/` and require authentication.
+All endpoints require authentication. Post endpoints are prefixed with `/api/posts/`; comment, like, and stats endpoints are prefixed with `/api/engagements/`.
 
 ### Posts
 
@@ -44,7 +44,7 @@ All endpoints are prefixed with `/api/posts/` and require authentication.
 |---|---|---|
 | GET | `/api/posts/` | List posts (search, filter, order, paginate) |
 | POST | `/api/posts/` | Create a post (auto-detects `#hashtags`) |
-| GET | `/api/posts/{id}/` | Post detail, with nested comments and replies |
+| GET | `/api/posts/{id}/` | Post detail and engagement counts |
 | PATCH | `/api/posts/{id}/` | Update a post (owner only) |
 | DELETE | `/api/posts/{id}/` | Delete a post (owner only) |
 
@@ -52,23 +52,19 @@ All endpoints are prefixed with `/api/posts/` and require authentication.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/posts/{id}/comments/` | List comments on a post |
-| POST | `/api/posts/{id}/comments/` | Comment on a post |
-| GET | `/api/posts/comments/{id}/` | Comment detail, with nested replies |
-| PATCH | `/api/posts/comments/{id}/` | Update a comment (owner only) |
-| DELETE | `/api/posts/comments/{id}/` | Delete a comment (owner only) |
+| GET | `/api/engagements/{id}/comments/` | List top-level comments on a post |
+| POST | `/api/engagements/{id}/comments/` | Comment on a post |
+| GET | `/api/engagements/comments/{id}/` | Comment detail, with its replies |
+| PATCH | `/api/engagements/comments/{id}/` | Update a comment or reply (owner only) |
+| DELETE | `/api/engagements/comments/{id}/` | Delete a comment or reply (owner only) |
 
 ### Replies
 
-Replies are a separate model from comments (not self-referential), which structurally enforces one level of nesting.
+Replies are comments with a self-referential `reply_to` foreign key. The API permits only one level of nesting.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/posts/comments/{id}/replies/` | List replies on a comment |
-| POST | `/api/posts/comments/{id}/replies/` | Reply to a comment |
-| GET | `/api/posts/replies/{id}/` | Reply detail |
-| PATCH | `/api/posts/replies/{id}/` | Update a reply (owner only) |
-| DELETE | `/api/posts/replies/{id}/` | Delete a reply (owner only) |
+| POST | `/api/engagements/comments/{id}/replies/` | Reply to a comment |
 
 ### Likes
 
@@ -76,9 +72,8 @@ Likes use a single generic `Like` model (via `GenericForeignKey`) shared across 
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/posts/{id}/like/` | Toggle like on a post |
-| POST | `/api/posts/comments/{id}/like/` | Toggle like on a comment |
-| POST | `/api/posts/replies/{id}/like/` | Toggle like on a reply |
+| POST | `/api/engagements/posts/{id}/like/` | Toggle like on a post |
+| POST | `/api/engagements/comments/{id}/like/` | Toggle like on a comment |
 
 ### Hashtags & Filtering
 
@@ -93,7 +88,7 @@ Likes use a single generic `Like` model (via `GenericForeignKey`) shared across 
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/posts/stats/` | Top liked posts, most active users, content totals |
+| GET | `/api/engagements/stats/` | Top liked posts, most active users, content totals |
 
 ## Runtime Configuration
 

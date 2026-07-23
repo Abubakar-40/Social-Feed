@@ -1,7 +1,6 @@
 from constance import config
 from rest_framework import serializers
 
-from engagements.serializers import CommentWithRepliesSerializer
 from posts.models import Hashtag, Post
 from users.serializers import UserSerializer
 
@@ -14,7 +13,7 @@ class HashtagSerializer(serializers.ModelSerializer):
 
 class PostSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    hashtags = HashtagSerializer(many=True, read_only=True)
+    hashtags = serializers.SerializerMethodField()
     like_count = serializers.IntegerField(read_only=True, default=0)
     comment_count = serializers.IntegerField(read_only=True, default=0)
 
@@ -22,12 +21,9 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = ("id", "user", "content", "hashtags", "like_count", "comment_count", "created")
 
-
-class PostDetailSerializer(PostSerializer):
-    comments = CommentWithRepliesSerializer(many=True, read_only=True)
-
-    class Meta(PostSerializer.Meta):
-        fields = PostSerializer.Meta.fields + ("comments",)
+    def get_hashtags(self, post):
+        hashtags = [post_hashtag.hashtag for post_hashtag in post.post_hashtags.all()]
+        return HashtagSerializer(hashtags, many=True).data
 
 
 class PostCreateUpdateSerializer(serializers.ModelSerializer):

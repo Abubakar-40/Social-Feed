@@ -1,6 +1,6 @@
 from django.db import models
 
-from engagements.managers import CommentManager
+from engagements.choices import LikeStatus
 from users.models import BaseModel
 
 
@@ -10,8 +10,6 @@ class Comment(BaseModel):
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="comments")
     post = models.ForeignKey("posts.Post", on_delete=models.CASCADE, related_name="comments")
     reply_to = models.ForeignKey("self", on_delete=models.CASCADE, related_name="replies", null=True, blank=True)
-
-    objects = CommentManager()
 
     class Meta:
         verbose_name = "Comment"
@@ -28,6 +26,7 @@ class Like(BaseModel):
     comment = models.ForeignKey(
         "engagements.Comment", on_delete=models.CASCADE, related_name="likes", null=True, blank=True
     )
+    status = models.CharField(max_length=10, choices=LikeStatus.choices, default=LikeStatus.LIKE)
 
     class Meta:
         verbose_name = "Like"
@@ -50,4 +49,4 @@ class Like(BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.user.username} likes {self.post or self.comment}"
+        return f"{self.user.username} {self.status}s {self.post or self.comment}"
