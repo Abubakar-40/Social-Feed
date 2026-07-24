@@ -62,9 +62,4 @@ class Migration(migrations.Migration):
                 'unique_together': {('post', 'hashtag')},
             },
         ),
-        migrations.AddField(
-            model_name='post',
-            name='hashtags',
-            field=models.ManyToManyField(blank=True, related_name='posts', through='posts.PostHashtag', to='posts.hashtag'),
-        ),
     ]
