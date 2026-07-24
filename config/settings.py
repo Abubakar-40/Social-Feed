@@ -10,24 +10,27 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from config.constances import CONSTANCE_CONFIG
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-u(rs$8k0f0s#-+1qnm(itu3_e$ip5ywa+sfq&g+hc85iq3+u_x'
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [host for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host]
 
 
 # Application definition
@@ -46,6 +49,7 @@ THIRD_PARTY_APPS = (
     "rest_framework.authtoken",
     "django_filters",
     "constance",
+    "django_ckeditor_5",
 )
 
 CUSTOM_APPS = (
@@ -71,10 +75,10 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 10,
+    "PAGE_SIZE": 50,
 }
 
-CONSTANCE_BACKEND = "constance.backends.memory.MemoryBackend"
+CONSTANCE_BACKEND = os.getenv("CONSTANCE_BACKEND")
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -112,8 +116,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        "ENGINE": os.getenv("DB_ENGINE"),
+        "NAME": BASE_DIR / os.getenv("DB_NAME"),
     }
 }
 

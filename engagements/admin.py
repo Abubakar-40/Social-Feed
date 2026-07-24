@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from engagements.models import Comment, Like
+from engagements.models import Comment, Reaction
 
 
 @admin.register(Comment)
@@ -10,7 +10,7 @@ class CommentAdmin(admin.ModelAdmin):
     search_fields = ("content", "user__username")
 
 
-@admin.register(Like)
-class LikeAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "post", "comment", "created")
+@admin.register(Reaction)
+class ReactionAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "post", "comment", "is_active", "created")
     search_fields = ("user__username",)

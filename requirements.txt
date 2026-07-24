@@ -3,3 +3,5 @@ djangorestframework==3.17.1
 django-filter==26.1
 django-constance==4.3.5
 django-extensions==4.1
+django-ckeditor-5==0.2.20
+python-dotenv==1.2.1

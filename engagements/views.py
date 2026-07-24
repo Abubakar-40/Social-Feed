@@ -1,170 +1,82 @@
-from django.db.models import Count, IntegerField, OuterRef, Prefetch, Subquery
-from django.db.models.functions import Coalesce
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, get_object_or_404
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from engagements.choices import LikeStatus
-from engagements.models import Comment, Like
-from engagements.serializers import CommentSerializer, CommentWithRepliesSerializer
+from engagements.models import Comment, Reaction
+from engagements.serializers import (
+    CommentCreateSerializer,
+    CommentSerializer,
+    CommentWithRepliesSerializer,
+    ReactionSerializer,
+)
+from engagements.utils import (
+    get_comments_queryset,
+    get_most_active_users,
+    get_top_reacted_posts,
+    toggle_reaction,
+)
 from posts.models import Post
 from posts.serializers import PostSerializer
-from users.models import User
 from users.permissions import IsOwner
 
 
 class CommentListCreateAPIView(ListCreateAPIView):
-    parent_type = None
-    serializer_class = CommentSerializer
     search_fields = ("content",)
     ordering_fields = ("created", "like_count", "reply_count")
-
-    def get(self, request, *args, **kwargs):
-        if self.parent_type == "comment":
-            return self.http_method_not_allowed(request, *args, **kwargs)
-
-        return super().get(request, *args, **kwargs)
+    ordering = ("-created",)
 
     def get_queryset(self):
-        like_count_query = (
-            Like.objects.filter(comment_id=OuterRef("pk"), status=LikeStatus.LIKE)
-            .order_by()
-            .values("comment_id")
-            .annotate(total=Count("id"))
-            .values("total")
-        )
-        reply_count_query = (
-            Comment.objects.filter(reply_to_id=OuterRef("pk"))
-            .order_by()
-            .values("reply_to_id")
-            .annotate(total=Count("id"))
-            .values("total")
-        )
-        return (
-            Comment.objects.select_related("user")
-            .filter(post_id=self.kwargs["pk"], reply_to__isnull=True)
-            .annotate(
-                like_count=Coalesce(Subquery(like_count_query, output_field=IntegerField()), 0),
-                reply_count=Coalesce(Subquery(reply_count_query, output_field=IntegerField()), 0),
-            )
-        )
+        post_id = self.request.query_params.get("post_id")
+        if post_id is None:
+            raise ValidationError({"post_id": "This query parameter is required."})
+
+        return get_comments_queryset().filter(post_id=post_id, reply_to__isnull=True)
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return CommentCreateSerializer
+
+        return CommentSerializer
 
     def perform_create(self, serializer):
-        if self.parent_type == "post":
-            post = get_object_or_404(Post, pk=self.kwargs["pk"])
-            serializer.save(user=self.request.user, post=post)
-            return
-
-        parent_comment = get_object_or_404(Comment, pk=self.kwargs["pk"])
-        if parent_comment.reply_to_id is not None:
-            raise ValidationError("Cannot reply to a reply.")
-
-        serializer.save(user=self.request.user, post=parent_comment.post, reply_to=parent_comment)
+        serializer.save(user=self.request.user)
 
 
 class CommentRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
-    serializer_class = CommentWithRepliesSerializer
     permission_classes = (IsAuthenticated, IsOwner)
 
     def get_queryset(self):
-        like_count_query = (
-            Like.objects.filter(comment_id=OuterRef("pk"), status=LikeStatus.LIKE)
-            .order_by()
-            .values("comment_id")
-            .annotate(total=Count("id"))
-            .values("total")
-        )
-        reply_count_query = (
-            Comment.objects.filter(reply_to_id=OuterRef("pk"))
-            .order_by()
-            .values("reply_to_id")
-            .annotate(total=Count("id"))
-            .values("total")
-        )
-        replies_queryset = Comment.objects.select_related("user").annotate(
-            like_count=Coalesce(Subquery(like_count_query, output_field=IntegerField()), 0),
-            reply_count=Coalesce(Subquery(reply_count_query, output_field=IntegerField()), 0),
-        )
-        return (
-            Comment.objects.select_related("user")
-            .annotate(
-                like_count=Coalesce(Subquery(like_count_query, output_field=IntegerField()), 0),
-                reply_count=Coalesce(Subquery(reply_count_query, output_field=IntegerField()), 0),
-            )
-            .prefetch_related(Prefetch("replies", queryset=replies_queryset))
-        )
+        return get_comments_queryset(include_replies=True)
+
+    def get_serializer_class(self):
+        if self.request.method in ("PUT", "PATCH"):
+            return CommentSerializer
+
+        return CommentWithRepliesSerializer
 
 
-class LikeAPIView(APIView):
-    model = None
-    like_field = None
+class ReactionToggleAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = ReactionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        is_active, created = toggle_reaction(request.user, **serializer.validated_data)
 
-    def post(self, request, pk, *args, **kwargs):
-        obj = get_object_or_404(self.model, pk=pk)
-        like, created = Like.objects.get_or_create(
-            user=request.user,
-            defaults={"status": LikeStatus.LIKE},
-            **{self.like_field: obj},
-        )
+        response_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK
 
-        if not created:
-            like.status = LikeStatus.UNLIKE if like.status == LikeStatus.LIKE else LikeStatus.LIKE
-            like.save(update_fields=("status", "modified"))
-            return Response({"liked": like.status == LikeStatus.LIKE}, status=status.HTTP_200_OK)
-
-        return Response({"liked": True}, status=status.HTTP_201_CREATED)
+        return Response({"liked": is_active}, status=response_status)
 
 
 class StatsAPIView(APIView):
     def get(self, request, *args, **kwargs):
-        like_count_query = (
-            Like.objects.filter(post_id=OuterRef("pk"), status=LikeStatus.LIKE)
-            .order_by()
-            .values("post_id")
-            .annotate(total=Count("id"))
-            .values("total")
-        )
-        comment_count_query = (
-            Comment.objects.filter(post_id=OuterRef("pk"))
-            .order_by()
-            .values("post_id")
-            .annotate(total=Count("id"))
-            .values("total")
-        )
-        top_liked_posts = (
-            Post.objects.select_related("user")
-            .prefetch_related("post_hashtags__hashtag")
-            .annotate(
-                like_count=Coalesce(Subquery(like_count_query, output_field=IntegerField()), 0),
-                comment_count=Coalesce(Subquery(comment_count_query, output_field=IntegerField()), 0),
-            )
-            .order_by("-like_count")[:5]
-        )
-        post_count_query = (
-            Post.objects.filter(user_id=OuterRef("pk"))
-            .order_by()
-            .values("user_id")
-            .annotate(total=Count("id"))
-            .values("total")
-        )
-        user_comment_count_query = (
-            Comment.objects.filter(user_id=OuterRef("pk"))
-            .order_by()
-            .values("user_id")
-            .annotate(total=Count("id"))
-            .values("total")
-        )
-        active_users = User.objects.annotate(
-            post_count=Coalesce(Subquery(post_count_query, output_field=IntegerField()), 0),
-            comment_count=Coalesce(Subquery(user_comment_count_query, output_field=IntegerField()), 0),
-        ).order_by("-post_count", "-comment_count")[:5]
+        top_reacted_posts = get_top_reacted_posts()
+        active_users = get_most_active_users()
 
         return Response(
             {
-                "top_liked_posts": PostSerializer(top_liked_posts, many=True).data,
+                "top_liked_posts": PostSerializer(top_reacted_posts, many=True).data,
                 "most_active_users": [
                     {
                         "username": user.username,
@@ -176,7 +88,7 @@ class StatsAPIView(APIView):
                 "totals": {
                     "posts": Post.objects.count(),
                     "comments": Comment.objects.count(),
-                    "likes": Like.objects.filter(status=LikeStatus.LIKE).count(),
+                    "likes": Reaction.objects.filter(is_active=True).count(),
                 },
             },
             status=status.HTTP_200_OK,

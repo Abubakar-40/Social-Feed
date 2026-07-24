@@ -1,4 +1,5 @@
 from django.db import models
+from django_ckeditor_5.fields import CKEditor5Field
 
 from users.models import BaseModel
 
@@ -16,7 +17,7 @@ class Hashtag(BaseModel):
 
 
 class Post(BaseModel):
-    content = models.TextField()
+    content = CKEditor5Field()
 
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="posts")
 
@@ -26,7 +27,7 @@ class Post(BaseModel):
         db_table = "posts"
 
     def __str__(self):
-        return f"{self.user.username}: {self.content[:50]}"
+        return self.user.username
 
 
 class PostHashtag(BaseModel):

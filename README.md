@@ -15,7 +15,8 @@ A simplified social feed system inspired by Facebook's interaction model — pos
 ```
 config/     project settings, root urls, WSGI/ASGI, BaseModel, custom middleware
 users/      custom User model (AbstractUser), admin-managed, no signup/auth flow
-feeds/      Post, Comment, Reply, Like, Hashtag models and all feed-related API logic
+posts/      Post and Hashtag models and post-related API logic
+engagements/ Comment and Reaction models and engagement-related API logic
 ```
 
 Users are managed entirely through Django Admin — there is no signup/login endpoint. All API requests authenticate via DRF token auth (`Authorization: Token <key>`).
@@ -52,8 +53,8 @@ All endpoints require authentication. Post endpoints are prefixed with `/api/pos
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/engagements/{id}/comments/` | List top-level comments on a post |
-| POST | `/api/engagements/{id}/comments/` | Comment on a post |
+| GET | `/api/engagements/comments/?post_id={id}` | List top-level comments on a post |
+| POST | `/api/engagements/comments/` | Create a comment or reply using `post` and optional `reply_to` in the request body |
 | GET | `/api/engagements/comments/{id}/` | Comment detail, with its replies |
 | PATCH | `/api/engagements/comments/{id}/` | Update a comment or reply (owner only) |
 | DELETE | `/api/engagements/comments/{id}/` | Delete a comment or reply (owner only) |
@@ -64,16 +65,15 @@ Replies are comments with a self-referential `reply_to` foreign key. The API per
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/engagements/comments/{id}/replies/` | Reply to a comment |
+| - | Replies are created through the comments endpoint using `reply_to` in the request body. |
 
 ### Likes
 
-Likes use a single generic `Like` model (via `GenericForeignKey`) shared across posts, comments, and replies.
+Reactions use one model shared across posts and comments. Repeating the request toggles the reaction's `is_active` state.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/engagements/posts/{id}/like/` | Toggle like on a post |
-| POST | `/api/engagements/comments/{id}/like/` | Toggle like on a comment |
+| POST | `/api/engagements/reactions/` | Toggle a post or comment reaction using `target_type` and `target_id` in the request body |
 
 ### Hashtags & Filtering
 
