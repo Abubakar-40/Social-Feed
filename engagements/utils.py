@@ -5,6 +5,7 @@ from rest_framework.exceptions import ValidationError
 from engagements.models import Comment, Reaction
 from posts.models import Post
 from users.models import User
+from posts.utils import get_posts_queryset
 
 
 def get_comments_queryset(include_replies=False):
@@ -60,8 +61,6 @@ def toggle_reaction(user, target_type, target_id):
 
 
 def get_top_reacted_posts():
-    from posts.utils import get_posts_queryset
-
     return get_posts_queryset().order_by("-like_count")[:5]
 
 
